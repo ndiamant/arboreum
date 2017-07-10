@@ -1,12 +1,14 @@
+from abc import ABCMeta
+from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-ITERS = 1000
-WIDTH = 100
-HEIGHT = 20
-NUM_PLANTS = 20
+ITERS = 15
+WIDTH = 200
+HEIGHT = 30
+NUM_PLANTS = 10
 
 board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
 # only recalculate possible moves around changed pixel
@@ -16,7 +18,27 @@ board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
 Move = namedtuple('Move', 'coords id_ type_')
 
 
-class lame_plant:
+class BasePlant(metaclass=ABCMeta):
+    
+    @property
+    @abstractmethod
+    def branch_col(self): 
+        pass
+
+    @property
+    @abstractmethod
+    def leaf_col():
+        pass
+    
+    def __init__(self, branch_id, leaf_id):
+        self.branch_id = branch_id
+        self.leaf_id = leaf_id
+
+    @abstractmethod
+    def choose_move(self, moves):
+        pass
+
+class LamePlant(BasePlant):
 
     branch_col = np.array([139, 69, 19])/255.
     leaf_col = np.array([0, 100, 0])/255.
@@ -28,11 +50,28 @@ class lame_plant:
 
 
     def choose_move(self, moves):
-        # bad bc empty move probs
         return random.choice(moves)
 
 
-plants = [lame_plant(i, i+1) for i in range(1, NUM_PLANTS*2+1, 2)]
+class Brancher(BasePlant):
+    branch_col = np.array([0, 0, 200])/255.
+    leaf_col = np.array([0, 200, 0])/255.
+
+
+    def __init__(self, branch_id, leaf_id):
+        self.branch_id = branch_id
+        self.leaf_id = leaf_id
+
+
+    def choose_move(self, moves):
+        for move in moves:
+            if move.type_ == 1:
+                return move
+
+        return random.choice(moves)
+
+plants = [LamePlant(i, i+1) for i in range(1, NUM_PLANTS*2+1, 2)]
+plants += [Brancher(i + 2*NUM_PLANTS, i+1+2*NUM_PLANTS) for i in range(1, NUM_PLANTS*2+1, 2)]
 
 
 seeds = np.random.choice(WIDTH, len(plants), replace=False)
@@ -40,7 +79,6 @@ for seed, plant in zip(seeds, plants):
     board[HEIGHT-1, seed] = plant.branch_id 
     board[HEIGHT-2, seed] = plant.branch_id 
     board[HEIGHT-3, seed] = plant.leaf_id 
-
 
 
 def adjacent_empties(coord):
@@ -55,6 +93,7 @@ def adjacent_empties(coord):
         except IndexError:
             pass
     return empties
+
 
 def get_possible_moves(plant):
     """ returns 
@@ -75,18 +114,35 @@ def get_possible_moves(plant):
         for empty in empties:
             moves.append(Move(empty, plant.leaf_id, 2))
 
+    random.shuffle(moves)
     return moves # TODO: make unique
+
+
+def kill_plant(plant):
+    plant.branch_col = np.array([.3, .3, .3])
+    plant.leaf_col = np.array([.6, .6, .6])
+
+
+
 
 def next_move():
     resources = get_resources()
-    choice = np.random.choice(len(resources), p=resources/np.sum(resources))
-    plant = plants[choice]
-    possible_moves = get_possible_moves(plant)
-    if possible_moves:
-        move = plant.choose_move(possible_moves)
-        board[move.coords[0], move.coords[1]] = move.id_
-        resources[choice] -= move.type_
-
+    for i in np.where(resources == 0)[0]:
+        if i:
+            kill_plant(plants[int(i)])
+    while np.sum(resources) > 0:
+        choice = np.random.choice(len(resources), p=resources/np.sum(resources))
+        plant = plants[choice]
+        possible_moves = get_possible_moves(plant)
+        resource_count = resources[choice]
+        if resource_count == 1:
+            possible_moves = list(filter(lambda m: m.type_ == 1, possible_moves))
+        if possible_moves:
+            move = plant.choose_move(possible_moves)
+            board[move.coords[0], move.coords[1]] = move.id_
+            resources[choice] -= move.type_
+        else:
+            resources[choice] = 0
         
 
 
@@ -103,11 +159,11 @@ def get_resources():
     resources = np.zeros(len(plants))
     for x in range(WIDTH):
         for y in range(HEIGHT):
-            if board[y, x] != 0 and board[y, x] % 2 == 0:
-                resources[int(board[y, x] / 2 - 1)] += 2
+            if board[y, x] != 0:
+                if board[y, x] % 2 == 0:
+                    resources[int(board[y, x] / 2 - 1)] += 2
                 break
     return resources
-
 
 
 def draw_board():
@@ -123,7 +179,6 @@ def draw_board():
         to_display[board == plant.leaf_id] = plant.leaf_col
     plt.imshow(to_display, interpolation='nearest')
     plt.show()
-
 
 
 def run():
