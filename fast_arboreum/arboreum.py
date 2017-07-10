@@ -3,10 +3,10 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 
-ITERS = 10
-WIDTH = 15
-HEIGHT = 10
-
+ITERS = 1000
+WIDTH = 100
+HEIGHT = 20
+NUM_PLANTS = 20
 
 board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
 # only recalculate possible moves around changed pixel
@@ -18,6 +18,10 @@ Move = namedtuple('Move', 'coords id_ type_')
 
 class lame_plant:
 
+    branch_col = np.array([139, 69, 19])/255.
+    leaf_col = np.array([0, 100, 0])/255.
+
+
     def __init__(self, branch_id, leaf_id):
         self.branch_id = branch_id
         self.leaf_id = leaf_id
@@ -28,13 +32,14 @@ class lame_plant:
         return random.choice(moves)
 
 
-plants = [lame_plant(i, i+1) for i in range(1, 11, 2)]
+plants = [lame_plant(i, i+1) for i in range(1, NUM_PLANTS*2+1, 2)]
 
 
 seeds = np.random.choice(WIDTH, len(plants), replace=False)
 for seed, plant in zip(seeds, plants):
     board[HEIGHT-1, seed] = plant.branch_id 
-    board[HEIGHT-2, seed] = plant.leaf_id 
+    board[HEIGHT-2, seed] = plant.branch_id 
+    board[HEIGHT-3, seed] = plant.leaf_id 
 
 
 
@@ -99,16 +104,23 @@ def get_resources():
     for x in range(WIDTH):
         for y in range(HEIGHT):
             if board[y, x] != 0 and board[y, x] % 2 == 0:
-                resources[board[y, x] / 2 - 1] += 2
+                resources[int(board[y, x] / 2 - 1)] += 2
                 break
     return resources
 
 
 
 def draw_board():
-    to_display = np.zeros((HEIGHT, WIDTH, 3), dtype=np.int8)
-    to_display[board != 0] = np.array([0, 1, 0])
-    to_display[board % 2 != 0] = np.array([1, 0, 0])
+    to_display = np.zeros((HEIGHT, WIDTH, 3), dtype=float)
+    for x in range(WIDTH):
+        for y in range(HEIGHT):
+            b = board[y,x]
+            if b!=0:
+                color = np.array([(b%2) * b, ((b+1)%2) * b, 0], dtype=float)
+                to_display[y,x] = color
+    for plant in plants:
+        to_display[board == plant.branch_id] = plant.branch_col
+        to_display[board == plant.leaf_id] = plant.leaf_col
     plt.imshow(to_display, interpolation='nearest')
     plt.show()
 
@@ -116,6 +128,5 @@ def draw_board():
 
 def run():
     for _ in range(ITERS):
-        draw_board()
         next_move()
     draw_board()
