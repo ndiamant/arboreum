@@ -3,12 +3,13 @@ from scipy.misc import imsave
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import gif_writer
 
-ITERS = 10
+ITERS = 100
 WIDTH = 200
 HEIGHT = 30
-NUM_PLANTS = 10
-IGNORE_LEAVES = False
+NUM_PLANTS = 30
+IGNORE_LEAVES = True
 SAVE_BOARD = True
 
 board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
@@ -175,6 +176,7 @@ def kill_plant(plant):
 
 def next_move():
     resources = get_resources()
+    moves = []
     for i in np.where(resources == 0)[0]:
         kill_plant(plants[i])
     while np.sum(resources) > 0:
@@ -188,12 +190,15 @@ def next_move():
             possible_moves = list(filter(lambda m: m.type_ == 1, possible_moves))
         if possible_moves:
             move = plant.choose_move(possible_moves)
-            if SAVE_BOARD:
-                save_board(move)
             board[move.coords[0], move.coords[1]] = move.id_
             resources[choice] -= move.type_
+            if SAVE_BOARD:
+                moves.append(move) 
         else:
             resources[choice] = 0
+
+    if SAVE_BOARD:
+        save_board(moves)
         
 
 def get_resources():
@@ -221,17 +226,18 @@ def draw_board():
     return to_display
 
 
-def save_board(last_move):
+def save_board(moves):
     to_display = draw_board()
-    coords = tuple(last_move.coords.tolist())
+    
+    for move in moves:
+        coords = tuple(move.coords.tolist())
+        # white last move so highlighted
+        to_display[coords] = np.ones(3)
 
-    # white last move so highlighted
-    to_display[coords] = np.ones(3)
+    save_board.arrays.append(to_display)
 
-    imsave('images/{}.png'.format(save_board.counter), to_display)
-    save_board.counter += 1
-
-save_board.counter = 0
+#save_board.counter = 0
+save_board.arrays = []
 
 
 def run():
@@ -240,3 +246,5 @@ def run():
     to_display = draw_board()
     plt.imshow(to_display, interpolation='nearest')
     plt.show()
+    if SAVE_BOARD:
+        gif_writer.write_gif_from_arrays(save_board.arrays)
