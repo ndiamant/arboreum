@@ -4,15 +4,16 @@ import numpy as np
 import random
 import matplotlib.pyplot as plt
 import gif_writer
+import greenhouse
 
 ITERS = 100
-WIDTH = 200
-HEIGHT = 30
-NUM_PLANTS = 30
-IGNORE_LEAVES = True
+WIDTH = 201
+HEIGHT = 100
+NUM_PLANTS = 50
+IGNORE_LEAVES = False
 SAVE_BOARD = True
 
-board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
+board = np.zeros((HEIGHT, WIDTH), dtype=np.int16)
 # only recalculate possible moves around changed pixel
 # potentially store plant bounding box
 
@@ -20,103 +21,17 @@ board = np.zeros((HEIGHT, WIDTH), dtype=np.int8)
 Move = namedtuple('Move', 'coords id_ type_')
 
 
-class BasePlant(object):
-
-    def __init__(self, branch_id, leaf_id):
-        self.branch_id = branch_id
-        self.leaf_id = leaf_id
-        self.set_colors()
-        self.randomize_colors()
-
-    def randomize_colors(self):
-        self.branch_col = self.branch_col.astype(float)
-        self.leaf_col = self.leaf_col.astype(float)
-        self.branch_col /= float(np.max(self.branch_col))
-        self.leaf_col /= float(np.max(self.leaf_col))
-        self.branch_col += np.random.rand(3)/2
-        self.leaf_col += np.random.rand(3)/2
-        self.branch_col /= np.max(self.branch_col)
-        self.leaf_col /= np.max(self.leaf_col)
-
-    def choose_move(self, moves):
-        return random.choice(moves)
-
-    def set_colors(self):
-        self.branch_col = np.array([139, 69, 19])
-        self.leaf_col = np.array([0, 100, 0])
-
-
-
-class Brancher(BasePlant):
-
-    def choose_move(self, moves):
-        for move in moves:
-            if move.type_ == 1:
-                return move
-
-        return random.choice(moves)
-
-    def set_colors(self):
-        self.branch_col = np.array([0, 0, 200])
-        self.leaf_col = np.array([0, 200, 0])
-
-
-
-class LeftPlant(BasePlant):
-
-    def choose_move(self, moves):
-        m = moves[0]
-        for move in moves[1:]:
-            if move.coords[1] < m.coords[1]:
-                m = move
-
-        return m
-
-    def set_colors(self):
-        self.branch_col = np.array([100, 0, 100])
-        self.leaf_col = np.array([100, 100, 0])
-
-
-class RightPlant(BasePlant):
-
-    def choose_move(self, moves):
-        m = moves[0]
-        for move in moves[1:]:
-            if move.coords[1] > m.coords[1]:
-                m = move
-
-        return m
-
-    def set_colors(self):
-        self.branch_col = np.array([100, 0, 100])
-        self.leaf_col = np.array([100, 100, 0])
-
-class UpPlant(BasePlant):
-
-    def choose_move(self, moves):
-        m = moves[0]
-        for move in moves[1:]:
-            if move.coords[0] < m.coords[0]:
-                m = move
-
-        return m
-
-    def set_colors(self):
-        self.branch_col = np.array([100, 100, 0])
-        self.leaf_col = np.array([50, 50, 200])
-
-
 def add_plants(type_, num, plants):
     offset = plants[-1].leaf_id
     plants = [type_(i + offset, i + offset + 1) for i in range(1, num * 2 + 1, 2)]
     return plants
     
-plants=[BasePlant(1, 2)]
-plants += add_plants(BasePlant, NUM_PLANTS, plants)
-#plants += add_plants(Brancher, NUM_PLANTS, plants)
-plants += add_plants(LeftPlant, 1, plants)
-plants += add_plants(RightPlant, 1, plants)
-plants += add_plants(UpPlant, 2, plants)
+plants = [greenhouse.BasePlant(1, 2)]
+plants += add_plants(greenhouse.BasePlant, NUM_PLANTS, plants)
+plants += add_plants(greenhouse.Brancher, NUM_PLANTS, plants)
+plants += add_plants(greenhouse.LeftPlant, 1, plants)
+plants += add_plants(greenhouse.RightPlant, 1, plants)
+plants += add_plants(greenhouse.UpPlant, 2, plants)
 
 seeds = np.random.choice(WIDTH, len(plants), replace=False)
 for seed, plant in zip(seeds, plants):
@@ -236,7 +151,6 @@ def save_board(moves):
 
     save_board.arrays.append(to_display)
 
-#save_board.counter = 0
 save_board.arrays = []
 
 
